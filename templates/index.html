@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cognitive Pipeline Hybrid 2.0</title>
+</head>
+<body>
+
+<h2>Cognitive Pipeline Hybrid 2.0</h2>
+
+<input type="file" id="doc">
+<button onclick="upload()">Upload</button>
+
+<br><br>
+
+<textarea id="q" placeholder="Enter question here"></textarea>
+<button onclick="analyze()">Analyze</button>
+
+<pre id="out"></pre>
+
+<script>
+async function upload(){
+    const file = document.getElementById("doc").files[0];
+    const fd = new FormData();
+    fd.append("file", file);
+
+    await fetch("/upload",{method:"POST",body:fd});
+}
+
+async function analyze(){
+    const q=document.getElementById("q").value;
+
+    const res=await fetch("/analyze",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({question:q})
+    });
+
+    document.getElementById("out").innerText=
+        JSON.stringify(await res.json(),null,2);
+}
+</script>
+
+</body>
+</html>
