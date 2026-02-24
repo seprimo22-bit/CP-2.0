@@ -7,32 +7,44 @@
 
 <h2>Cognitive Pipeline Hybrid 2.0</h2>
 
+<h3>Upload Document (optional)</h3>
 <input type="file" id="doc">
-<button onclick="upload()">Upload</button>
 
 <br><br>
 
-<textarea id="q" placeholder="Enter question here"></textarea>
+<h3>OR Paste Document</h3>
+<textarea id="paste" placeholder="Paste document text here"
+rows="8" cols="60"></textarea>
+
+<br><br>
+
+<h3>Question</h3>
+<textarea id="q" placeholder="Enter question here"
+rows="2" cols="60"></textarea>
+
+<br><br>
+
 <button onclick="analyze()">Analyze</button>
 
+<hr>
 <pre id="out"></pre>
 
 <script>
-async function upload(){
-    const file = document.getElementById("doc").files[0];
-    const fd = new FormData();
-    fd.append("file", file);
-
-    await fetch("/upload",{method:"POST",body:fd});
-}
-
 async function analyze(){
-    const q=document.getElementById("q").value;
+
+    const file=document.getElementById("doc").files[0];
+    const paste=document.getElementById("paste").value;
+    const question=document.getElementById("q").value;
+
+    let formData=new FormData();
+
+    if(file) formData.append("file",file);
+    if(paste) formData.append("text",paste);
+    formData.append("question",question);
 
     const res=await fetch("/analyze",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({question:q})
+        body:formData
     });
 
     document.getElementById("out").innerText=
