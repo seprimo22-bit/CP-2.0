@@ -19,10 +19,12 @@ def initialize_engines():
     global rag_engine, pipeline_engine
 
     if pipeline_engine is None:
+        print("Initializing Cognitive Pipeline...")
         from cognitive_pipeline import CognitivePipeline
         pipeline_engine = CognitivePipeline()
 
     if rag_engine is None:
+        print("Initializing RAG Engine...")
         from rag_engine import RAGEngine
         rag_engine = RAGEngine()
 
@@ -34,6 +36,12 @@ def initialize_engines():
 @app.route("/")
 def home():
     return render_template("index.html")
+
+
+# ⭐ THIS IS THE NEW HEALTH CHECK ROUTE ⭐
+@app.route("/health")
+def health():
+    return "OK", 200
 
 
 @app.route("/analyze", methods=["POST"])
