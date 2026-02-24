@@ -1,56 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Cognitive Pipeline Hybrid 2.0</title>
-</head>
-<body>
-
-<h2>Cognitive Pipeline Hybrid 2.0</h2>
-
-<h3>Upload Document (optional)</h3>
-<input type="file" id="doc">
-
-<br><br>
-
-<h3>OR Paste Document</h3>
-<textarea id="paste" placeholder="Paste document text here"
-rows="8" cols="60"></textarea>
-
-<br><br>
-
-<h3>Question</h3>
-<textarea id="q" placeholder="Enter question here"
-rows="2" cols="60"></textarea>
-
-<br><br>
-
-<button onclick="analyze()">Analyze</button>
-
-<hr>
-<pre id="out"></pre>
-
 <script>
-async function analyze(){
+async function analyze() {
+    const question = document.getElementById("q").value;
+    const text = document.getElementById("doc_text")?.value || "";
+    const fileInput = document.getElementById("doc");
+    
+    const formData = new FormData();
+    formData.append("question", question);
+    formData.append("text", text);
 
-    const file=document.getElementById("doc").files[0];
-    const paste=document.getElementById("paste").value;
-    const question=document.getElementById("q").value;
+    if (fileInput.files.length > 0) {
+        formData.append("file", fileInput.files[0]);
+    }
 
-    let formData=new FormData();
-
-    if(file) formData.append("file",file);
-    if(paste) formData.append("text",paste);
-    formData.append("question",question);
-
-    const res=await fetch("/analyze",{
-        method:"POST",
-        body:formData
+    const res = await fetch("/analyze", {
+        method: "POST",
+        body: formData
     });
 
-    document.getElementById("out").innerText=
-        JSON.stringify(await res.json(),null,2);
+    const data = await res.json();
+    document.getElementById("out").innerText =
+        JSON.stringify(data, null, 2);
 }
 </script>
-
-</body>
-</html>
