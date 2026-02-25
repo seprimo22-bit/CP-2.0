@@ -1,11 +1,14 @@
 from flask import Flask, request, jsonify, render_template
 import os
+import openai
 import PyPDF2
 
-from rag_engine import RAGEngine
-
 app = Flask(__name__)
-rag = RAGEngine()
+
+# -------------------------------------------------
+# OPENAI SETUP
+# -------------------------------------------------
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 # -------------------------------------------------
@@ -17,7 +20,7 @@ def home():
 
 
 # -------------------------------------------------
-# HEALTH CHECK
+# HEALTH CHECK (Render needs this sometimes)
 # -------------------------------------------------
 @app.route("/health")
 def health():
@@ -31,93 +34,63 @@ def extract_pdf_text(file):
     text = ""
     reader = PyPDF2.PdfReader(file)
     for page in reader.pages:
-        if page.extract_text():
-            text += page.extract_text()
+        t = page.extract_text()
+        if t:
+            text += t
     return text
 
 
 # -------------------------------------------------
-# SIMPLE FACT EXTRACTION (Pipeline Core)
-# -------------------------------------------------
-TRIGGER_WORDS = [
-    "shows", "demonstrates", "indicates",
-    "reveals", "confirms", "improves",
-    "developed", "introduces"
-]
-
-def extract_facts(text):
-    sentences = text.split(".")
-    return [
-        s.strip()
-        for s in sentences
-        if any(w in s.lower() for w in TRIGGER_WORDS)
-    ]
-
-
-# -------------------------------------------------
-# ANALYZE ROUTE
+# ANALYZE ROUTE (THE MAIN ONE)
 # -------------------------------------------------
 @app.route("/analyze", methods=["POST"])
 def analyze():
 
-  import openai
+    question = request.form.get("question", "")
+    text = request.form.get("text", "")
+    file = request.files.get("file")
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+    # If a PDF uploaded, extract text
+    if file and file.filename.endswith(".pdf"):
+        text += extract_pdf_text(file)
 
-@app.route("/analyze", methods=["POST"])
-def analyze():
-
-    question = request.form.get("question")
-    text = request.form.get("text")
+    if not question:
+        return jsonify({"error": "No question provided"}), 400
 
     prompt = f"""
-    Document:
-    {text}
+You are a research assistant.
 
-    Question:
-    {question}
+Document:
+{text}
 
-    Answer clearly and concisely.
-    """
+Question:
+{question}
+
+Give a clear, direct answer based on the document.
+If the document has no info, answer generally.
+"""
 
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
         )
 
         answer = response.choices[0].message.content
 
         return jsonify({
-            "answer": answer
+            "answer": answer,
+            "text_length": len(text),
+            "file_uploaded": bool(file)
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500  
-
-    # Build vector index if we have text
-    if text:
-        rag.build_index([text])
-
-    # Retrieve relevant context
-    context_docs = rag.retrieve(question)
-
-    # Run cognitive extraction
-    facts = extract_facts(text)
-
-    return jsonify({
-        "question": question,
-        "facts_found": facts,
-        "context_docs": context_docs,
-        "text_length": len(text),
-        "file_processed": bool(file)
-    })
+        return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------
-# START SERVER
+# START SERVER (Render compatible)
 # -------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
