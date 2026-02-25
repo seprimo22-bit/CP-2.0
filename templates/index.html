@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cognitive Pipeline Hybrid 2.0</title>
+<title>Cognitive Pipeline 2.0</title>
 </head>
 <body>
 
-<h2>Cognitive Pipeline Hybrid 2.0</h2>
+<h2>Cognitive Pipeline 2.0</h2>
 
 <input type="file" id="doc">
 <br><br>
@@ -13,7 +13,7 @@
 <textarea id="doc_text" placeholder="Paste document text here"></textarea>
 <br><br>
 
-<textarea id="q" placeholder="Enter question here"></textarea>
+<textarea id="q" placeholder="Enter question"></textarea>
 <br><br>
 
 <button onclick="analyze()">Analyze</button>
@@ -22,7 +22,6 @@
 
 <script>
 async function analyze() {
-    console.log("Analyze clicked");
 
     const question = document.getElementById("q").value;
     const text = document.getElementById("doc_text").value;
@@ -32,7 +31,7 @@ async function analyze() {
     formData.append("question", question);
     formData.append("text", text);
 
-    if (fileInput.files.length > 0) {
+    if(fileInput.files.length > 0){
         formData.append("file", fileInput.files[0]);
     }
 
