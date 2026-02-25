@@ -60,16 +60,42 @@ def extract_facts(text):
 @app.route("/analyze", methods=["POST"])
 def analyze():
 
-    question = request.form.get("question", "")
-    text = request.form.get("text", "")
-    file = request.files.get("file")
+  import openai
 
-    # Extract text from uploaded PDF if present
-    if file:
-        try:
-            text += extract_pdf_text(file)
-        except Exception as e:
-            return jsonify({"error": str(e)})
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+@app.route("/analyze", methods=["POST"])
+def analyze():
+
+    question = request.form.get("question")
+    text = request.form.get("text")
+
+    prompt = f"""
+    Document:
+    {text}
+
+    Question:
+    {question}
+
+    Answer clearly and concisely.
+    """
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        answer = response.choices[0].message.content
+
+        return jsonify({
+            "answer": answer
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500  
 
     # Build vector index if we have text
     if text:
