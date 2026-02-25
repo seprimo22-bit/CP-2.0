@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify, render_template
 import os
+import PyPDF2
+
+from rag_engine import RAGEngine
 
 app = Flask(__name__)
+rag = RAGEngine()
+
 
 # -------------------------------------------------
 # HOME PAGE
@@ -12,7 +17,7 @@ def home():
 
 
 # -------------------------------------------------
-# HEALTH CHECK (Render needs this sometimes)
+# HEALTH CHECK
 # -------------------------------------------------
 @app.route("/health")
 def health():
@@ -20,20 +25,68 @@ def health():
 
 
 # -------------------------------------------------
-# ANALYZE ROUTE (WORKING BASELINE)
+# PDF TEXT EXTRACTION
+# -------------------------------------------------
+def extract_pdf_text(file):
+    text = ""
+    reader = PyPDF2.PdfReader(file)
+    for page in reader.pages:
+        if page.extract_text():
+            text += page.extract_text()
+    return text
+
+
+# -------------------------------------------------
+# SIMPLE FACT EXTRACTION (Pipeline Core)
+# -------------------------------------------------
+TRIGGER_WORDS = [
+    "shows", "demonstrates", "indicates",
+    "reveals", "confirms", "improves",
+    "developed", "introduces"
+]
+
+def extract_facts(text):
+    sentences = text.split(".")
+    return [
+        s.strip()
+        for s in sentences
+        if any(w in s.lower() for w in TRIGGER_WORDS)
+    ]
+
+
+# -------------------------------------------------
+# ANALYZE ROUTE
 # -------------------------------------------------
 @app.route("/analyze", methods=["POST"])
 def analyze():
 
-    question = request.form.get("question")
-    text = request.form.get("text")
+    question = request.form.get("question", "")
+    text = request.form.get("text", "")
     file = request.files.get("file")
 
+    # Extract text from uploaded PDF if present
+    if file:
+        try:
+            text += extract_pdf_text(file)
+        except Exception as e:
+            return jsonify({"error": str(e)})
+
+    # Build vector index if we have text
+    if text:
+        rag.build_index([text])
+
+    # Retrieve relevant context
+    context_docs = rag.retrieve(question)
+
+    # Run cognitive extraction
+    facts = extract_facts(text)
+
     return jsonify({
-        "status": "pipeline online",
         "question": question,
-        "text_length": len(text) if text else 0,
-        "file_uploaded": bool(file)
+        "facts_found": facts,
+        "context_docs": context_docs,
+        "text_length": len(text),
+        "file_processed": bool(file)
     })
 
 
