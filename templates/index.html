@@ -1,21 +1,145 @@
-<script>
-async function analyze() {
-    const question = document.getElementById("question").value;
-    const article = document.getElementById("article").value;
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cognitive Pipeline 2.0</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            margin: 6px 0;
+        }
+        button {
+            padding: 8px 14px;
+            margin: 4px 4px 10px 0;
+            cursor: pointer;
+        }
+        #out {
+            background: #f5f5f5;
+            padding: 10px;
+            white-space: pre-wrap;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
 
-    const response = await fetch("/query", {
+<h2>Cognitive Pipeline 2.0</h2>
+
+<!-- 1. FILE UPLOAD -->
+<h3>1. Upload document</h3>
+<input type="file" id="doc">
+<br><br>
+<button id="uploadBtn">Upload</button>
+
+<!-- 2. RAW TEXT AREA (OPTIONAL / EDITABLE) -->
+<h3>2. Document text</h3>
+<textarea id="doc_text" placeholder="Paste or edit document text here"></textarea>
+<br>
+<button id="indexBtn">Build Index</button>
+
+<!-- 3. QUESTION INPUT -->
+<h3>3. Ask a question</h3>
+<textarea id="q" placeholder="Enter question"></textarea>
+<br>
+<button id="analyzeBtn">Analyze</button>
+
+<h3>Output</h3>
+<pre id="out"></pre>
+
+<script>
+async function uploadFile() {
+    const fileInput = document.getElementById("doc");
+    const out = document.getElementById("out");
+
+    if (fileInput.files.length === 0) {
+        out.innerText = "No file selected.";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    out.innerText = "Uploading file...";
+
+    const res = await fetch("/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            query: question,
-            article: article
-        })
+        body: formData
     });
 
-    const data = await response.json();
-    console.log(data);
-    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+    const data = await res.json();
+
+    if (data.content) {
+        // Populate the text area with extracted text
+        document.getElementById("doc_text").value = data.content;
+    }
+
+    out.innerText = JSON.stringify(data, null, 2);
 }
 
+async function buildIndex() {
+    const text = document.getElementById("doc_text").value;
+    const out = document.getElementById("out");
+
+    if (!text.trim()) {
+        out.innerText = "No document text to index.";
+        return;
+    }
+
+    out.innerText = "Building index...";
+
+    // For now, treat the whole text as a single document
+    const payload = {
+        documents: [text]
+    };
+
+    const res = await fetch("/build-index", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    out.innerText = JSON.stringify(data, null, 2);
+}
+
+async function analyze() {
+    const question = document.getElementById("q").value;
+    const out = document.getElementById("out");
+
+    if (!question.trim()) {
+        out.innerText = "Please enter a question.";
+        return;
+    }
+
+    out.innerText = "Querying pipeline...";
+
+    const payload = {
+        query: question
+    };
+
+    const res = await fetch("/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    out.innerText = JSON.stringify(data, null, 2);
+}
+
+// Wire buttons
+document.getElementById("uploadBtn").addEventListener("click", uploadFile);
+document.getElementById("indexBtn").addEventListener("click", buildIndex);
 document.getElementById("analyzeBtn").addEventListener("click", analyze);
 </script>
+
+</body>
+</html>
