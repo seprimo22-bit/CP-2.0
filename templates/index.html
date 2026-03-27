@@ -1,50 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Cognitive Pipeline 2.0</title>
-</head>
-<body>
-
-<h2>Cognitive Pipeline 2.0</h2>
-
-<input type="file" id="doc">
-<br><br>
-
-<textarea id="doc_text" placeholder="Paste document text here"></textarea>
-<br><br>
-
-<textarea id="q" placeholder="Enter question"></textarea>
-<br><br>
-
-<button onclick="analyze()">Analyze</button>
-
-<pre id="out"></pre>
-
 <script>
 async function analyze() {
+    const question = document.getElementById("question").value;
+    const article = document.getElementById("article").value;
 
-    const question = document.getElementById("q").value;
-    const text = document.getElementById("doc_text").value;
-    const fileInput = document.getElementById("doc");
-
-    const formData = new FormData();
-    formData.append("question", question);
-    formData.append("text", text);
-
-    if(fileInput.files.length > 0){
-        formData.append("file", fileInput.files[0]);
-    }
-
-    const res = await fetch("/analyze", {
+    const response = await fetch("/query", {
         method: "POST",
-        body: formData
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            query: question,
+            article: article
+        })
     });
 
-    const data = await res.json();
-    document.getElementById("out").innerText =
-        JSON.stringify(data, null, 2);
+    const data = await response.json();
+    console.log(data);
+    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
 }
-</script>
 
-</body>
-</html>
+document.getElementById("analyzeBtn").addEventListener("click", analyze);
+</script>
