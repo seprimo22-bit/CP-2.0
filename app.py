@@ -1,97 +1,107 @@
-from flask import Flask, request, jsonify, render_template
 import os
-import openai
-import PyPDF2
+from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
-
-# -------------------------------------------------
-# OPENAI SETUP
-# -------------------------------------------------
-openai.api_key = os.getenv("OPENAI_API_KEY")
+app.config["UPLOAD_FOLDER"] = "uploads"
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 
-# -------------------------------------------------
-# HOME PAGE
-# -------------------------------------------------
+# -----------------------------
+# LAZY IMPORT HELPERS
+# -----------------------------
+def get_rag():
+    from rag_engine import RAGEngine
+    return RAGEngine()
+
+def get_weighting():
+    from rag_engine import WeightingEngine
+    return WeightingEngine()
+
+def get_openai_client():
+    from openai import OpenAI
+    return OpenAI()
+
+
+# -----------------------------
+# ROUTES
+# -----------------------------
 @app.route("/")
-def home():
+def index():
     return render_template("index.html")
 
 
-# -------------------------------------------------
-# HEALTH CHECK (Render needs this sometimes)
-# -------------------------------------------------
-@app.route("/health")
-def health():
-    return "OK", 200
+# -----------------------------
+# UPLOAD DOCUMENT
+# -----------------------------
+@app.route("/upload", methods=["POST"])
+def upload():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    file.save(path)
+
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    return jsonify({"message": "Uploaded", "content": text})
 
 
-# -------------------------------------------------
-# PDF TEXT EXTRACTION
-# -------------------------------------------------
-def extract_pdf_text(file):
-    text = ""
-    reader = PyPDF2.PdfReader(file)
-    for page in reader.pages:
-        t = page.extract_text()
-        if t:
-            text += t
-    return text
+# -----------------------------
+# BUILD INDEX
+# -----------------------------
+@app.route("/build-index", methods=["POST"])
+def build_index():
+    data = request.json
+    docs = data.get("documents", [])
+
+    if not docs:
+        return jsonify({"error": "No documents provided"}), 400
+
+    rag = get_rag()
+    rag.build_index(docs)
+
+    return jsonify({"message": "Index built", "count": len(docs)})
 
 
-# -------------------------------------------------
-# ANALYZE ROUTE (THE MAIN ONE)
-# -------------------------------------------------
-@app.route("/analyze", methods=["POST"])
-def analyze():
+# -----------------------------
+# QUERY RAG + OPENAI + WEIGHTING
+# -----------------------------
+@app.route("/query", methods=["POST"])
+def query():
+    data = request.json
+    user_query = data.get("query", "")
 
-    question = request.form.get("question", "")
-    text = request.form.get("text", "")
-    file = request.files.get("file")
+    if not user_query:
+        return jsonify({"error": "Query missing"}), 400
 
-    # If a PDF uploaded, extract text
-    if file and file.filename.endswith(".pdf"):
-        text += extract_pdf_text(file)
+    rag = get_rag()
+    weighting = get_weighting()
+    client = get_openai_client()
 
-    if not question:
-        return jsonify({"error": "No question provided"}), 400
+    # Retrieve docs
+    retrieved_docs = rag.retrieve(user_query, k=5)
+    context = "\n".join(retrieved_docs)
 
-    prompt = f"""
-You are a research assistant.
+    # Call OpenAI
+    ai_response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": "You are an assistant that uses retrieved context."},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuery: {user_query}"}
+        ]
+    )
 
-Document:
-{text}
+    answer = ai_response.choices[0].message["content"]
 
-Question:
-{question}
+    # Confidence placeholders (you can replace with real scoring)
+    ai_conf = 0.9
+    doc_conf = 0.7 if retrieved_docs else 0.2
+    fact_conf = 0.6
 
-Give a clear, direct answer based on the document.
-If the document has no info, answer generally.
-"""
+    final_score = weighting.combine(ai_conf, doc_conf, fact_conf)
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
-        )
-
-        answer = response.choices[0].message.content
-
-        return jsonify({
-            "answer": answer,
-            "text_length": len(text),
-            "file_uploaded": bool(file)
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# -------------------------------------------------
-# START SERVER (Render compatible)
-# -------------------------------------------------
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    return jsonify({
+        "answer": answer,
+        "retrieved
