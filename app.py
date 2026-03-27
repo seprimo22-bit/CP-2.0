@@ -95,7 +95,7 @@ def query():
 
     answer = ai_response.choices[0].message["content"]
 
-    # Confidence placeholders (you can replace with real scoring)
+    # Confidence placeholders
     ai_conf = 0.9
     doc_conf = 0.7 if retrieved_docs else 0.2
     fact_conf = 0.6
@@ -104,4 +104,13 @@ def query():
 
     return jsonify({
         "answer": answer,
-        "retrieved
+        "retrieved_docs": retrieved_docs,
+        "confidence": final_score
+    })
+
+
+# -----------------------------
+# MAIN
+# -----------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
