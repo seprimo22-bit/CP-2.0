@@ -67,3 +67,13 @@ class RAGEngine:
             for i in idx[0]
             if 0 <= i < len(self.documents)
         ]
+
+
+class WeightingEngine:
+
+    def combine(self, ai_conf, doc_conf, fact_conf):
+        return (
+            ai_conf * 0.4 +
+            doc_conf * 0.4 +
+            fact_conf * 0.2
+            )
